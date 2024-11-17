@@ -7,11 +7,11 @@ from custom_vgg import CustomVGG19
 
 # Configuration
 data_dir = 'data/256_ObjectCategories'  # Replace with the path to your 101_ObjectCategories folder
-batch_size = 32
+batch_size = 128
 num_epochs = 10  # Adjust as needed
 learning_rate = 0.001
 num_classes = 257  # Caltech 256 has 256 categories + 1 background category
-train_ratio = 0.01  # 10% for training, 90% for testing
+train_ratio = 0.8  # 10% for training, 90% for testing
 
 # Check if MPS (Mac GPU) is available; else use CPU
 device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
@@ -41,10 +41,12 @@ model = model.to(device)
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
-# Training loop
+# Training loop with accuracy printing
 for epoch in range(num_epochs):
     model.train()
     running_loss = 0.0
+    running_corrects = 0
+    total_samples = 0
 
     for i, (inputs, labels) in enumerate(train_loader):
         inputs, labels = inputs.to(device), labels.to(device)
@@ -58,13 +60,25 @@ for epoch in range(num_epochs):
         loss.backward()
         optimizer.step()
 
+        # Update loss
         running_loss += loss.item()
+        
+        # Compute accuracy
+        _, predicted = torch.max(outputs, 1)
+        running_corrects += (predicted == labels).sum().item()
+        total_samples += labels.size(0)
+
+        # Print stats every 10 steps
         if (i + 1) % 10 == 0:
-            print(f"Epoch [{epoch+1}/{num_epochs}], Step [{i+1}/{len(train_loader)}], Loss: {loss.item():.4f}")
+            batch_accuracy = 100 * running_corrects / total_samples
+            print(f"Epoch [{epoch+1}/{num_epochs}], Step [{i+1}/{len(train_loader)}], "
+                  f"Loss: {loss.item():.4f}, Accuracy: {batch_accuracy:.2f}%")
     
-    # Print epoch loss
+    # Print epoch stats
     epoch_loss = running_loss / len(train_loader)
-    print(f"Epoch [{epoch+1}/{num_epochs}] Loss: {epoch_loss:.4f}")
+    epoch_accuracy = 100 * running_corrects / total_samples
+    print(f"Epoch [{epoch+1}/{num_epochs}] Loss: {epoch_loss:.4f}, Accuracy: {epoch_accuracy:.2f}%")
+
 
 # Testing loop
 model.eval()
